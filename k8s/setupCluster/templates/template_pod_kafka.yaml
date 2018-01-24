@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $volumeId
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  flexVolume:
+    driver: "alicloud/disk"
+    fsType: "ext4"
+    options:
+      volumeId: "$volumeId"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ namespace: kafka
+ name: $volumeId
+spec:
+ accessModes:
+   - ReadWriteMany
+ resources:
+   requests:
+     storage: 20Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: kafka
+  name: $kafkaPodName
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+       app: hyperledger
+       role: kafka
+       kafka-id: $kafkaID
+       ns: kafka
+    spec:
+      affinity:
+       podAntiAffinity:
+#         preferredDuringSchedulingIgnoredDuringExecution:
+#         - weight: 100
+#           podAffinityTerm:
+#              labelSelector:
+#                matchExpressions:
+#                - key: "role"
+#                  operator: In
+#                  values:
+#                  - kafka
+#              topologyKey: "kubernetes.io/hostname"
+         requiredDuringSchedulingIgnoredDuringExecution:
+         - labelSelector:
+             matchExpressions:
+             - key: "role"
+               operator: In
+               values:
+               - kafka
+           topologyKey: "kubernetes.io/hostname"
+       podAffinity:
+         preferredDuringSchedulingIgnoredDuringExecution:
+         - weight: 100
+           podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "role"
+                  operator: In
+                  values:
+                  - zookeeper
+              topologyKey: "kubernetes.io/hostname"
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: $kafkaPodName
+          image: hyperledger/fabric-kafka:x86_64-1.1.0-preview
+          env:
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "3"
+            - name: KAFKA_MESSAGE_MAX_BYTES
+              value: "103809024"
+            - name: KAFKA_REPLICA_FETCH_MAX_BYTES
+              value: "103809024"
+            - name: KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE
+              value: "false"
+            - name: KAFKA_BROKER_ID
+              value: "$seq"
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "2"
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "3"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "10000"
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: "zookeeper0.kafka:2181,zookeeper1.kafka:2181,zookeeper2.kafka:2181"
+            - name: KAFKA_ADVERTISED_HOST_NAME
+              value: "$advertisedHostname"
+            - name: KAFKA_LOG_DIRS
+              value: "/tmp/kafka-logs/data"
+            - name: KAFKA_LOG_DIR
+              value: "/tmp/kafka-logs/data"
+            - name: KAFKA_CONTROLLED_SHUTDOWN_ENABLED
+              value: "true"
+            - name: aliyun_logs_fluentd
+              value: "stdout"
+          volumeMounts:
+            - mountPath: /tmp/kafka-logs
+              name: data
+          lifecycle:
+            preStop:
+              exec:
+                # SIGTERM triggers a quick exit; gracefully terminate instead
+                command: ["/opt/kafka/bin/kafka-server-stop.sh"]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+              claimName: $volumeId
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: kafka
+   name: $kafkaID
+spec:
+ selector:
+   app: hyperledger
+   role: kafka
+   kafka-id: $kafkaID
+   ns: kafka
+ clusterIP: None
+ ports:
+   - name: kafka-port1
+     protocol: TCP
+     port: 9092
+
+   - name: kafka-port2
+     protocol: TCP
+     port: 9093
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: kafka
+   name: $kafkaID-ex
+spec:
+ selector:
+   app: hyperledger
+   role: kafka
+   kafka-id: $kafkaID
+   ns: kafka
+ type: NodePort
+ ports:
+   - name: kafka-port1
+     protocol: TCP
+     port: 9092
+     targetPort: 9092
+     nodePort: $nodePort1
+
+   - name: kafka-port2
+     protocol: TCP
+     port: 9093
+     targetPort: 9093
+     nodePort: $nodePort2

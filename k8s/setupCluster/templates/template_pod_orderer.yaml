@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $volumeId
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  flexVolume:
+    driver: "alicloud/disk"
+    fsType: "ext4"
+    options:
+      volumeId: "$volumeId"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ namespace: $namespace
+ name: $volumeId
+spec:
+ accessModes:
+   - ReadWriteMany
+ resources:
+   requests:
+     storage: 20Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: $namespace
+  name: $podName
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: hyperledger
+        role: orderer
+        org: $namespace
+        orderer-id: $ordererID
+    spec:
+      affinity:
+       podAntiAffinity:
+         requiredDuringSchedulingIgnoredDuringExecution:
+         - labelSelector:
+             matchExpressions:
+             - key: "role"
+               operator: In
+               values:
+               - orderer
+           topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: $podName
+        image: hyperledger/fabric-orderer:x86_64-1.1.0-preview
+        env:
+        - name: ORDERER_GENERAL_LOGLEVEL
+          value: debug
+        - name: ORDERER_GENERAL_LISTENADDRESS
+          value: 0.0.0.0
+        - name: ORDERER_GENERAL_GENESISMETHOD
+          value: file
+        - name: ORDERER_GENERAL_GENESISFILE
+          value: /var/fabric/orderer/orderer.genesis.block
+        - name: ORDERER_GENERAL_LOCALMSPID
+          value: $localMSPID
+        - name: ORDERER_GENERAL_LOCALMSPDIR
+          value: /var/fabric/orderer/msp
+        - name: ORDERER_GENERAL_TLS_ENABLED
+          value: "true"
+        - name: ORDERER_GENERAL_TLS_PRIVATEKEY
+          value: /var/fabric/orderer/tls/server.key
+        - name: ORDERER_GENERAL_TLS_CERTIFICATE
+          value: /var/fabric/orderer/tls/server.crt
+        - name: ORDERER_GENERAL_TLS_ROOTCAS
+          value: '[/var/fabric/orderer/tls/ca.crt]'
+        - name: ORDERER_KAFKA_RETRY_SHORTINTERVAL
+          value: "1s"
+        - name: ORDERER_KAFKA_RETRY_SHORTTOTAL
+          value: "30s"
+        - name: ORDERER_KAFKA_VERSION
+          value: "0.10.2.0"
+        - name: ORDERER_KAFKA_VERBOSE
+          value: "true"
+        - name: aliyun_logs_fluentd
+          value: "stdout"
+        workingDir: /opt/gopath/src/github.com/hyperledger/fabric
+        ports:
+         - containerPort: 7050
+        command: ["orderer"]
+        volumeMounts:
+         - mountPath: /var/fabric/orderer/msp
+           name: certificate
+           #subPath: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/msp
+           subPath: $mspPath
+         - mountPath: /var/fabric/orderer/tls
+           name: certificate
+           #subPath: crypto-config/ordererOrganizations/example.com/orderers/orderer.example.com/tls/
+           subPath: $tlsPath
+         - mountPath: /var/fabric/orderer/orderer.genesis.block
+           name: certificate
+           subPath: genesis.block
+         - mountPath: /var/hyperledger/production/orderer
+           name: data
+      volumes:
+       - name: certificate
+         persistentVolumeClaim:
+             claimName: $pvName
+       - name: data
+         persistentVolumeClaim:
+             claimName: $volumeId
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: $ordererID
+  namespace: $namespace
+spec:
+ selector:
+   app: hyperledger
+   role: orderer
+   orderer-id: $ordererID
+   org: $namespace
+ clusterIP: None
+ ports:
+   - name: listen-endpoint
+     protocol: TCP
+     port: 7050
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: $ordererID-ex
+  namespace: $namespace
+spec:
+ selector:
+   app: hyperledger
+   role: orderer
+   orderer-id: $ordererID
+   org: $namespace
+ type: NodePort
+ ports:
+   - name: listen-endpoint
+     protocol: TCP
+     port: 7050
+     targetPort: 7050
+     nodePort: $nodePort
+---

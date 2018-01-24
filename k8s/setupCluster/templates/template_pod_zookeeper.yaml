@@ -1,0 +1,173 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $logVolume
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  flexVolume:
+    driver: "alicloud/disk"
+    fsType: "ext4"
+    options:
+      volumeId: "$logVolume"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $dataVolume
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  flexVolume:
+    driver: "alicloud/disk"
+    fsType: "ext4"
+    options:
+      volumeId: "$dataVolume"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ namespace: kafka
+ name: $logVolume
+spec:
+ accessModes:
+   - ReadWriteMany
+ resources:
+   requests:
+     storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ namespace: kafka
+ name: $dataVolume
+spec:
+ accessModes:
+   - ReadWriteMany
+ resources:
+   requests:
+     storage: 20Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: kafka
+  name: $zkPodName
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+       app: hyperledger
+       role: zookeeper
+       zookeeper-id: $zookeeperID
+       ns: kafka
+    spec:
+      affinity:
+       podAntiAffinity:
+         requiredDuringSchedulingIgnoredDuringExecution:
+         - labelSelector:
+             matchExpressions:
+             - key: "role"
+               operator: In
+               values:
+               - zookeeper
+           topologyKey: "kubernetes.io/hostname"
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: $zkPodName
+          image: hyperledger/fabric-zookeeper:x86_64-1.1.0-preview
+          env:
+            - name: ZOO_MY_ID
+              value: "$seq"
+            - name: ZOO_SERVERS
+              value: "$zooServers"
+            - name: ZOO_TICK_TIME
+              value: "2000"
+            - name: ZOO_INIT_LIMIT
+              value: "10"
+            - name: ZOO_SYNC_LIMIT
+              value: "2"
+            - name: aliyun_logs_fluentd
+              value: "stdout"
+          volumeMounts:
+            - mountPath: /datalog
+              name: datalog
+            - mountPath: /data
+              name: data
+          lifecycle:
+            preStop:
+              exec:
+                # SIGTERM triggers a quick exit; gracefully terminate instead
+                command: ["zkServer.sh", "stop"]
+      volumes:
+        - name: datalog
+          persistentVolumeClaim:
+              claimName: $logVolume
+        - name: data
+          persistentVolumeClaim:
+              claimName: $dataVolume
+---
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: kafka
+   name: $zookeeperID
+spec:
+ selector:
+   app: hyperledger
+   role: zookeeper
+   zookeeper-id: $zookeeperID
+   ns: kafka
+ clusterIP: None
+
+ ports:
+   - name: zookeeper-port1
+     protocol: TCP
+     port: 2888
+
+   - name: zookeeper-port2
+     protocol: TCP
+     port: 3888
+
+   - name: zookeeper-port3
+     protocol: TCP
+     port: 2181
+---
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: kafka
+   name: $zookeeperID-ex
+spec:
+ selector:
+   app: hyperledger
+   role: zookeeper
+   zookeeper-id: $zookeeperID
+   ns: kafka
+ type: NodePort
+ ports:
+   - name: zookeeper-port1
+     protocol: TCP
+     port: 2888
+     targetPort: 2888
+     nodePort: $nodePort1
+
+   - name: zookeeper-port2
+     protocol: TCP
+     port: 3888
+     targetPort: 3888
+     nodePort: $nodePort2
+
+   - name: zookeeper-port3
+     protocol: TCP
+     port: 2181
+     targetPort: 2181
+     nodePort: $nodePort3
+---

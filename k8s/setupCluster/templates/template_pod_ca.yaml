@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $volumeId
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  flexVolume:
+    driver: "alicloud/disk"
+    fsType: "ext4"
+    options:
+      volumeId: "$volumeId"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+ namespace: $namespace
+ name: $volumeId
+spec:
+ accessModes:
+   - ReadWriteMany
+ resources:
+   requests:
+     storage: 20Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: $namespace
+  name: ca
+spec:
+  replicas: 1
+  strategy: {}
+  template:
+    metadata:
+      labels:
+       app: hyperledger
+       role: ca
+       org: $namespace
+       name: ca
+    spec:
+     affinity:
+       podAntiAffinity:
+         requiredDuringSchedulingIgnoredDuringExecution:
+         - labelSelector:
+             matchExpressions:
+             - key: "role"
+               operator: In
+               values:
+               - ca
+           topologyKey: "kubernetes.io/hostname"
+       podAffinity:
+         preferredDuringSchedulingIgnoredDuringExecution:
+         - weight: 100
+           podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: "role"
+                  operator: In
+                  values:
+                  - peer
+                - key: "org"
+                  operator: In
+                  values:
+                  - $namespace
+              topologyKey: "kubernetes.io/hostname"
+     containers:
+       - name: ca
+         image: hyperledger/fabric-ca:x86_64-1.1.0-preview
+         env:
+         - name:  FABRIC_CA_HOME
+           value: /etc/hyperledger/fabric-ca-server
+         - name:  FABRIC_CA_SERVER_CA_NAME
+           value: ca
+         - name:  FABRIC_CA_SERVER_TLS_ENABLED
+           value: "true"
+         - name:  FABRIC_CA_SERVER_TLS_CERTFILE
+           value: $tlsCert
+         - name:  FABRIC_CA_SERVER_TLS_KEYFILE
+           value: $tlsKey
+         - name: aliyun_logs_fluentd
+           value: "stdout"
+         ports:
+          - containerPort: 7054
+         command: ["sh"]
+         args:  ["-c", $command]
+         volumeMounts:
+          - mountPath: /etc/hyperledger/fabric-ca-server-config/ca
+            name: certificate
+            subPath: $caPath
+          - mountPath: /etc/hyperledger/fabric-ca-server
+            name: data
+     volumes:
+       - name: certificate
+         persistentVolumeClaim:
+             claimName: $pvName
+       - name: data
+         persistentVolumeClaim:
+             claimName: $volumeId
+
+--- 
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: $namespace
+   name: ca
+spec:
+ selector:
+   app: hyperledger
+   role: ca
+   org: $namespace
+   name: ca
+ clusterIP: None
+ ports:
+   - name: endpoint
+     protocol: TCP
+     port: 7054
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+   namespace: $namespace
+   name: ca-ex
+spec:
+ selector:
+   app: hyperledger
+   role: ca
+   org: $namespace
+   name: ca
+ type: NodePort
+ ports:
+   - name: endpoint
+     protocol: TCP
+     port: 7054
+     targetPort: 7054
+     nodePort: $nodePort
+

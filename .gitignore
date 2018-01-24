@@ -1,0 +1,5 @@
+.idea
+k8s/bin
+k8s/setupCluster/channel-artifacts
+k8s/setupCluster/crypto-config
+*.pyc
