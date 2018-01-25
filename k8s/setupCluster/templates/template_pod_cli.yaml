@@ -66,31 +66,31 @@ spec:
       labels:
        app: cli
     spec:
-      affinity:
-       podAntiAffinity:
-         requiredDuringSchedulingIgnoredDuringExecution:
-         - labelSelector:
-             matchExpressions:
-             - key: "app"
-               operator: In
-               values:
-               - cli
-           topologyKey: "kubernetes.io/hostname"
-       podAffinity:
-         preferredDuringSchedulingIgnoredDuringExecution:
-         - weight: 100
-           podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: "role"
-                  operator: In
-                  values:
-                  - peer
-                - key: "org"
-                  operator: In
-                  values:
-                  - $namespace
-              topologyKey: "kubernetes.io/hostname"
+#      affinity:
+#       podAntiAffinity:
+#         requiredDuringSchedulingIgnoredDuringExecution:
+#         - labelSelector:
+#             matchExpressions:
+#             - key: "app"
+#               operator: In
+#               values:
+#               - cli
+#           topologyKey: "kubernetes.io/hostname"
+#       podAffinity:
+#         preferredDuringSchedulingIgnoredDuringExecution:
+#         - weight: 100
+#           podAffinityTerm:
+#              labelSelector:
+#                matchExpressions:
+#                - key: "role"
+#                  operator: In
+#                  values:
+#                  - peer
+#                - key: "org"
+#                  operator: In
+#                  values:
+#                  - $namespace
+#              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: $name
           image:  hyperledger/fabric-tools:x86_64-1.1.0-preview

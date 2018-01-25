@@ -1,57 +1,57 @@
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: $logVolume
-spec:
-  capacity:
-    storage: 20Gi
-  accessModes:
-    - ReadWriteMany
-  flexVolume:
-    driver: "alicloud/disk"
-    fsType: "ext4"
-    options:
-      volumeId: "$logVolume"
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: $dataVolume
-spec:
-  capacity:
-    storage: 20Gi
-  accessModes:
-    - ReadWriteMany
-  flexVolume:
-    driver: "alicloud/disk"
-    fsType: "ext4"
-    options:
-      volumeId: "$dataVolume"
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
- namespace: kafka
- name: $logVolume
-spec:
- accessModes:
-   - ReadWriteMany
- resources:
-   requests:
-     storage: 20Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
- namespace: kafka
- name: $dataVolume
-spec:
- accessModes:
-   - ReadWriteMany
- resources:
-   requests:
-     storage: 20Gi
----
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: $logVolume
+#spec:
+#  capacity:
+#    storage: 20Gi
+#  accessModes:
+#    - ReadWriteMany
+#  flexVolume:
+#    driver: "alicloud/disk"
+#    fsType: "ext4"
+#    options:
+#      volumeId: "$logVolume"
+#---
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: $dataVolume
+#spec:
+#  capacity:
+#    storage: 20Gi
+#  accessModes:
+#    - ReadWriteMany
+#  flexVolume:
+#    driver: "alicloud/disk"
+#    fsType: "ext4"
+#    options:
+#      volumeId: "$dataVolume"
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+# namespace: kafka
+# name: $logVolume
+#spec:
+# accessModes:
+#   - ReadWriteMany
+# resources:
+#   requests:
+#     storage: 20Gi
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+# namespace: kafka
+# name: $dataVolume
+#spec:
+# accessModes:
+#   - ReadWriteMany
+# resources:
+#   requests:
+#     storage: 20Gi
+#---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -69,16 +69,16 @@ spec:
        zookeeper-id: $zookeeperID
        ns: kafka
     spec:
-      affinity:
-       podAntiAffinity:
-         requiredDuringSchedulingIgnoredDuringExecution:
-         - labelSelector:
-             matchExpressions:
-             - key: "role"
-               operator: In
-               values:
-               - zookeeper
-           topologyKey: "kubernetes.io/hostname"
+#      affinity:
+#       podAntiAffinity:
+#         requiredDuringSchedulingIgnoredDuringExecution:
+#         - labelSelector:
+#             matchExpressions:
+#             - key: "role"
+#               operator: In
+#               values:
+#               - zookeeper
+#           topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 120
       containers:
         - name: $zkPodName
@@ -96,23 +96,23 @@ spec:
               value: "2"
             - name: aliyun_logs_fluentd
               value: "stdout"
-          volumeMounts:
-            - mountPath: /datalog
-              name: datalog
-            - mountPath: /data
-              name: data
+#          volumeMounts:
+#            - mountPath: /datalog
+#              name: datalog
+#            - mountPath: /data
+#              name: data
           lifecycle:
             preStop:
               exec:
                 # SIGTERM triggers a quick exit; gracefully terminate instead
                 command: ["zkServer.sh", "stop"]
-      volumes:
-        - name: datalog
-          persistentVolumeClaim:
-              claimName: $logVolume
-        - name: data
-          persistentVolumeClaim:
-              claimName: $dataVolume
+#      volumes:
+#        - name: datalog
+#          persistentVolumeClaim:
+#              claimName: $logVolume
+#        - name: data
+#          persistentVolumeClaim:
+#              claimName: $dataVolume
 ---
 apiVersion: v1
 kind: Service

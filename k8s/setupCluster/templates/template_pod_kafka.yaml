@@ -1,30 +1,30 @@
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: $volumeId
-spec:
-  capacity:
-    storage: 20Gi
-  accessModes:
-    - ReadWriteMany
-  flexVolume:
-    driver: "alicloud/disk"
-    fsType: "ext4"
-    options:
-      volumeId: "$volumeId"
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
- namespace: kafka
- name: $volumeId
-spec:
- accessModes:
-   - ReadWriteMany
- resources:
-   requests:
-     storage: 20Gi
----
+#apiVersion: v1
+#kind: PersistentVolume
+#metadata:
+#  name: $volumeId
+#spec:
+#  capacity:
+#    storage: 20Gi
+#  accessModes:
+#    - ReadWriteMany
+#  flexVolume:
+#    driver: "alicloud/disk"
+#    fsType: "ext4"
+#    options:
+#      volumeId: "$volumeId"
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+# namespace: kafka
+# name: $volumeId
+#spec:
+# accessModes:
+#   - ReadWriteMany
+# resources:
+#   requests:
+#     storage: 20Gi
+#---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -42,8 +42,17 @@ spec:
        kafka-id: $kafkaID
        ns: kafka
     spec:
-      affinity:
-       podAntiAffinity:
+#      affinity:
+#       podAntiAffinity:
+#         requiredDuringSchedulingIgnoredDuringExecution:
+#         - labelSelector:
+#             matchExpressions:
+#             - key: "role"
+#               operator: In
+#               values:
+#               - kafka
+#           topologyKey: "kubernetes.io/hostname"
+#       podAffinity:
 #         preferredDuringSchedulingIgnoredDuringExecution:
 #         - weight: 100
 #           podAffinityTerm:
@@ -52,27 +61,8 @@ spec:
 #                - key: "role"
 #                  operator: In
 #                  values:
-#                  - kafka
+#                  - zookeeper
 #              topologyKey: "kubernetes.io/hostname"
-         requiredDuringSchedulingIgnoredDuringExecution:
-         - labelSelector:
-             matchExpressions:
-             - key: "role"
-               operator: In
-               values:
-               - kafka
-           topologyKey: "kubernetes.io/hostname"
-       podAffinity:
-         preferredDuringSchedulingIgnoredDuringExecution:
-         - weight: 100
-           podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: "role"
-                  operator: In
-                  values:
-                  - zookeeper
-              topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 120
       containers:
         - name: $kafkaPodName
@@ -106,18 +96,18 @@ spec:
               value: "true"
             - name: aliyun_logs_fluentd
               value: "stdout"
-          volumeMounts:
-            - mountPath: /tmp/kafka-logs
-              name: data
+#          volumeMounts:
+#            - mountPath: /tmp/kafka-logs
+#              name: data
           lifecycle:
             preStop:
               exec:
                 # SIGTERM triggers a quick exit; gracefully terminate instead
                 command: ["/opt/kafka/bin/kafka-server-stop.sh"]
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-              claimName: $volumeId
+#      volumes:
+#        - name: data
+#          persistentVolumeClaim:
+#              claimName: $volumeId
 ---
 
 apiVersion: v1
