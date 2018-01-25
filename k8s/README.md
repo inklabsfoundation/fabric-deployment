@@ -1,4 +1,4 @@
-# Setup inkchain environment
+# Setup fabric environment
 
 ### Prerequisite
 
